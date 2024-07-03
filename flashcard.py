@@ -1,102 +1,85 @@
 import streamlit as st
 import random
+import pandas as pd
 
-# Function to read words from a file
-def read_words(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        words = [line.strip() for line in file.readlines()]
-    return words
+
+@st.cache_data
+def read_hsk_file(file_path):
+    # function to parse the HSK text files
+    columns = ['simplified', 'traditional', 'pingyin_a', 'pingyin', 'meaning']
+    # Read the file into a pandas DataFrame
+    df = pd.read_csv(file_path, sep='\t', header=None, names=columns)
+    return df
 
 # Center the title in the middle of the page
-st.markdown("<h1 style='text-align: center;'>Flashcards</h1>", unsafe_allow_html=True)
-
-# Load English words and Chinese characters
-english_words = read_words('data/english_words.txt')
-chinese_characters = read_words('data/chinese_characters.txt')
+st.markdown("<h1 style='text-align: center;'>Learn Chinese Flashcard</h1>", unsafe_allow_html=True)
 
 # Initialize session state for tracking progress
 if 'index' not in st.session_state:
     st.session_state.index = 0
-if 'known_words' not in st.session_state:
-    st.session_state.known_words = set()
-if 'unknown_words' not in st.session_state:
-    st.session_state.unknown_words = set()
-if 'learning' not in st.session_state:
-    st.session_state.learning = True
-if 'language_preference' not in st.session_state:
-    st.session_state.language_preference = 'English'
-if 'show_status' not in st.session_state:
-    st.session_state.show_status = False
+if 'known_words_index' not in st.session_state:
+    st.session_state.known_words_index = []
+if 'unknown_words_index' not in st.session_state:
+    st.session_state.unknown_words_index = []
 
-def navigate(offset):
-    st.session_state.index += offset
-    st.session_state.index = max(0, min(st.session_state.index, len(current_words) - 1))
-
-# Checkboxes to choose language preference
-col1, col2 = st.columns(2)
-with col1:
-    english_checkbox = st.checkbox("English", value=True)
-with col2:
-    chinese_checkbox = st.checkbox("Chinese")
-
-if english_checkbox and chinese_checkbox:
-    st.session_state.language_preference = random.choice(['English', 'Chinese'])
-elif english_checkbox:
-    st.session_state.language_preference = 'English'
-elif chinese_checkbox:
-    st.session_state.language_preference = 'Chinese'
-else:
-    st.warning("Please select at least one language.")
+data_file = st.selectbox('Please choose word set',['hsk_l1','hsk_l2','hsk_l3','hsk_l4','hsk_l5','hsk_l6'])
+if not data_file:
+    st.warning("Please select at least one data file to start!")
     st.stop()
 
-# Set current words based on language preference
-if st.session_state.language_preference == 'English':
-    current_words = english_words
-else:
-    current_words = chinese_characters
+df = read_hsk_file(f'data/HSK/{data_file}.txt')
+n_word = df.shape[0]
 
-# Function to record the unknown words
-def record_unknown():
-    word = current_words[st.session_state.index]
-    st.session_state.unknown_words.add(word)
-    if word in st.session_state.known_words:
-        st.session_state.known_words.remove(word)
-    st.experimental_rerun()
+col1, col2, col3, col4= st.columns(4)
+with col2:
+    show_pingyin = st.checkbox("Show Pingyin", value=False)
+with col3:
+    show_english = st.checkbox("Show English", value=False)
 
+    
 # Display the current flashcard
-if st.session_state.learning:
-    word = current_words[st.session_state.index]
 
-    # Display word in larger font size
-    st.markdown(f"<h1 style='text-align: center; font-size: 9em;'>{word}</h1>", unsafe_allow_html=True)
+word = df.simplified.iloc[st.session_state.index]
+if show_pingyin:
+    pingyin = df.pingyin.iloc[st.session_state.index]
+    st.markdown(f"<p style='text-align: center; font-size: 3em;'>{pingyin}</p>", unsafe_allow_html=True)
 
-    # Navigation buttons and "I do not know this" button
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        if st.button("⬅️ Previous"):
-            navigate(-1)
-    with col2:
-        if st.button("I do not know this", key="unknown"):
-            record_unknown()
-    with col3:
-        if st.button("Next ➡️"):
-            navigate(1)
+# Display word in larger font size
+st.markdown(f"<h1 style='text-align: center; font-size: 6em;'>{word}</h1>", unsafe_allow_html=True)
 
-    # Display current word index
-    st.write(f"Flashcard {st.session_state.index + 1} of {len(current_words)}")
+if show_english:
+    meaning = df.meaning.iloc[st.session_state.index]
+    st.markdown(f"<p style='text-align: center; font-size: 3em;'>{meaning}</p>", unsafe_allow_html=True)
+
+# Navigation buttons and "I do not know this" button
+col1, col2, col3 = st.columns([1, 1, 1])
+with col1:
+    if st.button("⬅️ Previous"):
+        st.session_state.index = max(st.session_state.index-1,0)
+        st.rerun()
+with col2:
+    if st.button("I do not know this", key="unknown"):
+        st.session_state.unknown_words_index.append(st.session_state.index)
+        st.rerun()
+with col3:
+    if st.button("Next ➡️"):
+        st.session_state.index = min(st.session_state.index+1,n_word-1)
+        st.rerun()
+
+# Display current word index
+st.write(f"Flashcard {st.session_state.index + 1} of {n_word}")
 
 # Check my status checkbox
-st.session_state.show_status = st.checkbox("Show My Learning Status")
+st.session_state.show_status = st.checkbox("Show the records of unknown words")
 
 # Display learning status
 if st.session_state.show_status:
-    st.write("### Words you know:")
-    st.write(", ".join(sorted(st.session_state.known_words)))
+    st.write(df.simplified.loc[st.session_state.unknown_words_index].unique())
+#    st.write("### Words you know:")
+#    st.write(", ".join(st.session_state.known_words))
 
-    st.write("### Words you do not know:")
-    st.write(", ".join(sorted(st.session_state.unknown_words)))
+#    st.write("### Words you do not know:")
+#    st.write(", ".join(st.session_state.unknown_words))
 
 # Automatically add words to known list if not marked unknown
-current_word = current_words[st.session_state.index]
-if current_word not in st.session_state.unknown_words:
-    st.session_state.known_words.add(current_word)
+#record_known()

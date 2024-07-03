@@ -22,9 +22,6 @@ def nextone():
 
 # Center the title in the middle of the page
 st.markdown("<h1 style='text-align: center;'>Learn Chinese Flashcard</h1>", unsafe_allow_html=True)
-st.markdown('-------')
-st.write('This simple app is designed to help parents, tutors, and teachers quickly guide students through character reviews. For questions and suggestions, please contact jianganghao@gmail.com.')
-st.markdown('-------')
 
 # Initialize session state for tracking progress
 if 'index' not in st.session_state:
